@@ -97,6 +97,7 @@ class DDPBase(Accelerator):
         Returns:
 
         """
+        import sys
         # offset the process id if requested
         process_idx = process_idx + proc_offset
 
@@ -117,7 +118,8 @@ class DDPBase(Accelerator):
         model.init_ddp_connection(
             self.trainer.global_rank,
             self.trainer.world_size,
-            self.trainer.is_slurm_managing_tasks
+            self.trainer.is_slurm_managing_tasks,
+            self.trainer.is_lsf_managing_tasks
         )
 
         # call setup after the ddp process has connected

@@ -865,7 +865,43 @@ class LightningModule(ABC, DeviceDtypeModuleMixin, GradInformation, ModelIO, Mod
         root_node = self.trainer.slurm_connector.resolve_root_node_address(root_node)
         os.environ['MASTER_ADDR'] = root_node
 
-    def init_ddp_connection(self, global_rank: int, world_size: int, is_slurm_managing_tasks: bool = True) -> None:
+    def _init_lsf_connection(self) -> None:
+        """"""
+        """
+        Sets up environment variables necessary for pytorch distributed communications
+        based on slurm environment.
+        """
+        # use slurm job id for the port number
+        # guarantees unique ports across jobs from same grid search
+        try:
+            # use the last 4 numbers in the job id as the id
+            default_port = os.environ['LSB_JOB_ID']
+            default_port = default_port[-4:]
+
+            # all ports should be in the 10k+ range
+            default_port = int(default_port) + 15000
+
+        except Exception:
+            default_port = 12910
+
+        # if user gave a port number, use that one instead
+        try:
+            default_port = os.environ['MASTER_PORT']
+        except Exception:
+            os.environ['MASTER_PORT'] = str(default_port)
+
+        # figure out the root node addr
+        try:
+            root_node = sorted(set(x for x in open(os.environ['LSB_DJOB_HOSTFILE'], 'r') if 'batch' not in x and 'login' not in x))[0][:-1]
+        except Exception:
+            root_node = '127.0.0.1'
+
+        root_node = self.trainer.lsf_connector.resolve_root_node_address(root_node)
+        os.environ['MASTER_ADDR'] = root_node
+
+
+
+    def init_ddp_connection(self, global_rank: int, world_size: int, is_slurm_managing_tasks: bool = True, is_lsf_managing_tasks: bool = False) -> None:
         """
         Override to define your custom way of setting up a distributed environment.
 
@@ -879,6 +915,10 @@ class LightningModule(ABC, DeviceDtypeModuleMixin, GradInformation, ModelIO, Mod
         """
         if is_slurm_managing_tasks:
             self._init_slurm_connection()
+        elif is_lsf_managing_tasks:
+            self._init_lsf_connection()
+        else:
+            log.debug("Not using Slurm or LSF to manage tasks")
 
         if 'MASTER_ADDR' not in os.environ:
             rank_zero_warn("MASTER_ADDR environment variable is not defined. Set as localhost")

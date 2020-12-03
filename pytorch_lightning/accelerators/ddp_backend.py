@@ -45,6 +45,8 @@ class DDPBackend(DDPBase):
     def setup(self, model):
         if self.mode == 'ddp':
             self.__ddp_script_mode_setup()
+        elif self.mode == 'lsf_ddp':
+            self.__lsf_setup()
         elif self.mode == 'slurm_ddp':
             self.__slurm_setup()
         elif self.mode == 'torchelastic_ddp':
@@ -54,6 +56,9 @@ class DDPBackend(DDPBase):
 
     def __slurm_setup(self):
         self.task_idx = int(os.environ['SLURM_LOCALID'])
+
+    def __lsf_setup(self):
+        self.task_idx = int(os.environ['JSM_NAMESPACE_LOCAL_RANK'])
 
     def __torchelastic_setup(self):
         self.task_idx = int(os.environ['LOCAL_RANK'])

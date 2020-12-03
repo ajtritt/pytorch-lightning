@@ -49,6 +49,7 @@ from pytorch_lightning.trainer.connectors.model_connector import ModelConnector
 from pytorch_lightning.trainer.connectors.debugging_connector import DebuggingConnector
 from pytorch_lightning.trainer.connectors.checkpoint_connector import CheckpointConnector
 from pytorch_lightning.trainer.connectors.slurm_connector import SLURMConnector
+from pytorch_lightning.trainer.connectors.lsf_connector import LSFConnector
 from pytorch_lightning import _logger as log
 from pytorch_lightning.tuner.tuning import Tuner
 from pytorch_lightning.trainer.connectors.precision_connector import PrecisionConnector
@@ -152,6 +153,7 @@ class Trainer(
         self.profile_connector = ProfilerConnector(self)
         self.checkpoint_connector = CheckpointConnector(self)
         self.slurm_connector = SLURMConnector(self)
+        self.lsf_connector = LSFConnector(self)
         self.tuner = Tuner(self)
         self.accelerator_backend = None
         self.evaluation_loop = EvaluationLoop(self)
@@ -306,18 +308,29 @@ class Trainer(
         self.accelerator_backend = self.accelerator_connector.select_accelerator()
         self.accelerator_backend.setup(model)
         results = self.accelerator_backend.train()
+        from datetime import datetime
+        import sys
+        b = datetime.now()
         self.accelerator_backend.teardown()
+        a = datetime.now()
+        print("accelerator_backend.teardown:", (a-b).total_seconds(), file=sys.stderr)
 
         # -------------------------
         # POST-Training
         # -------------------------
         # hook
+        b = datetime.now()
         self.call_hook('on_fit_end')
+        a = datetime.now()
+        print("on_fit_end", (a-b).total_seconds(), file=sys.stderr)
 
         # hook
+        b = datetime.now()
         self.teardown('fit')
         if self.is_function_implemented('teardown'):
             model.teardown('fit')
+        a = datetime.now()
+        print("teardown fit", (a-b).total_seconds(), file=sys.stderr)
 
         # return 1 when finished
         # used for testing or when we need to know that training succeeded

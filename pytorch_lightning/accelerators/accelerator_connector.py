@@ -110,6 +110,7 @@ class AcceleratorConnector:
         # link up SLURM
         # TODO: this should be taken out of here... but depends too much on DDP
         self.trainer.slurm_connector.on_trainer_init(self.trainer.num_nodes)
+        self.trainer.lsf_connector.on_trainer_init(self.trainer.num_nodes)
         self.trainer.node_rank = self.determine_ddp_node_rank()
         self.trainer.local_rank = self.determine_local_rank()
         self.trainer.global_rank = 0
@@ -125,6 +126,9 @@ class AcceleratorConnector:
         # SLURM ddp
         use_slurm_ddp = self.trainer.use_ddp and self.trainer.is_slurm_managing_tasks
 
+        # LSF ddp
+        use_lsf_ddp = self.trainer.use_ddp and self.trainer.is_lsf_managing_tasks
+
         # torchelastic or general non_slurm ddp
         te_flags_passed = 'WORLD_SIZE' in os.environ and ('GROUP_RANK' in os.environ or 'NODE_RANK' in os.environ)
         use_torchelastic_ddp = self.trainer.use_ddp and te_flags_passed
@@ -138,6 +142,9 @@ class AcceleratorConnector:
 
         elif use_slurm_ddp:
             accelerator_backend = accelerators.DDPBackend(self.trainer, mode='slurm_ddp')
+
+        elif use_lsf_ddp:
+            accelerator_backend = accelerators.DDPBackend(self.trainer, mode='lsf_ddp')
 
         elif use_torchelastic_ddp:
             accelerator_backend = accelerators.DDPBackend(self.trainer, mode='torchelastic_ddp')
@@ -291,12 +298,18 @@ class AcceleratorConnector:
     def determine_local_rank(self):
         if self.trainer.is_slurm_managing_tasks:
             return int(os.environ['SLURM_LOCALID'])
+        elif self.trainer.is_lsf_managing_tasks:
+            return int(os.environ['JSM_NAMESPACE_LOCAL_RANK'])
         else:
             return int(os.environ.get('LOCAL_RANK', 0))
 
     def determine_ddp_node_rank(self):
         if self.trainer.is_slurm_managing_tasks:
             return int(os.environ['SLURM_NODEID'])
+        elif self.trainer.is_lsf_managing_tasks:
+            # ajtritt: This denominator needs to be configurable.
+            # Right now it only works because I am running with 6 processes/node on Summit
+            return (int(os.environ['JSM_NAMESPACE_RANK']) // 6)
 
         # torchelastic uses the envvar GROUP_RANK, whereas other systems(?) use NODE_RANK.
         # otherwise use given node rank or default to node rank 0

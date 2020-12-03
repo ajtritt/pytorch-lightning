@@ -46,7 +46,7 @@ class LSFConnector:
 
         # notify user the that lsf is managing tasks
         if self.trainer.is_lsf_managing_tasks:
-            rank_zero_info('Multi-processing is handled by Slurm.')
+            rank_zero_info('Multi-processing is handled by LSF.')
 
     def resolve_root_node_address(self, root_node):
         if '[' in root_node:
